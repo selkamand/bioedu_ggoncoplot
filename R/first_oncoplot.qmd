@@ -1,0 +1,69 @@
+---
+title: "Creating Your First Oncoplot"
+format: html
+editor: visual
+---
+
+# Creating your first oncoplot
+
+## Step 1: Install Required Packages
+
+```{r, eval=FALSE}
+install.packages("tidyverse")
+install.packages("remotes")
+install.packages("readxl")
+install.packages("somaticflags")
+install.packages('ggEDA', repos = c('https://ccicb.r-universe.dev'))
+install.packages('ggoncoplot', repos = c('https://selkamand.r-universe.dev', 'https://cloud.r-project.org'), dependencies = TRUE)
+```
+
+## Step 2: Load Libraries
+
+```{r}
+# For reading excel files
+library(readxl)
+
+# Miscellaneous EDA
+library(tidyverse)
+
+# Making our Oncoplot
+library(ggoncoplot)
+
+# Exclude Noisy Genes
+library(somaticflags)
+
+# Create relative filepaths
+library(here)
+```
+
+## Step 3: Read Data
+
+We'll be using this glioblastoma dataset (gbm.xlsx)
+
+```{r}
+# Read Genomic Data
+gbm <- read_excel(here("data/gbm.xlsx"))
+
+# Print First few rows
+head(gbm)
+
+# See the whole dataset (uncomment and run)
+# View(gbm)
+```
+
+## Step 4: Create Oncoplot
+
+```{r}
+ggoncoplot(gbm, col_genes = "Gene", col_samples = "Sample")
+```
+
+```{r}
+ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample", 
+  col_mutation_type = "Variant_Classification", 
+  genes_to_ignore = somaticflags,
+  draw_tmb_barplot = TRUE
+)
+```
