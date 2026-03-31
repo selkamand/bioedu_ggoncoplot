@@ -6,18 +6,26 @@ editor: visual
 
 # Creating your first oncoplot
 
-## Step 1: Install Required Packages
+## Step 1: Install Required Packages 
+
+Only have to run this once.
+
+Tip: run one line at a time and make sure install works correctly.
 
 ```{r, eval=FALSE}
 install.packages("tidyverse")
 install.packages("remotes")
 install.packages("readxl")
 install.packages("somaticflags")
+install.packages("ggiraph")
+install.packages("patchwork")
 install.packages('ggEDA', repos = c('https://ccicb.r-universe.dev'))
-install.packages('ggoncoplot', repos = c('https://selkamand.r-universe.dev', 'https://cloud.r-project.org'), dependencies = TRUE)
+install.packages('ggoncoplot', repos = c('https://selkamand.r-universe.dev'))
 ```
 
 ## Step 2: Load Libraries
+
+Libraries are 'premade' pieces of other peoples code.
 
 ```{r}
 # For reading excel files
@@ -38,7 +46,7 @@ library(here)
 
 ## Step 3: Read Data
 
-We'll be using this glioblastoma dataset (gbm.xlsx)
+We'll be using a glioblastoma TCGA dataset (`data/gbm.xlsx`)
 
 ```{r}
 # Read Genomic Data
@@ -48,14 +56,54 @@ gbm <- read_excel(here("data/gbm.xlsx"))
 head(gbm)
 
 # See the whole dataset (uncomment and run)
-# View(gbm)
+View(gbm)
 ```
 
 ## Step 4: Create Oncoplot
 
+### Basic Oncoplot
+
 ```{r}
 ggoncoplot(gbm, col_genes = "Gene", col_samples = "Sample")
 ```
+
+### Show all samples
+
+By default many oncoplots will only show unaltered samples. To show every sample in your cohort set `show_all_samples = TRUE`
+
+```{r}
+ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample",
+  show_all_samples = TRUE
+)
+```
+
+### Colour based on mutation type
+
+```{r}
+ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample", 
+  col_mutation_type = "Variant_Classification", # Colours based on mutation type
+)
+```
+
+### Customise tooltips
+
+```{r}
+ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample", 
+  col_mutation_type = "Variant_Classification", # Colours based on mutation type
+  col_tooltip = "Mutation" # Add mutations to tooltip
+)
+```
+
+### Add marginal plots
 
 ```{r}
 ggoncoplot(
@@ -63,7 +111,101 @@ ggoncoplot(
   col_genes = "Gene", 
   col_samples = "Sample", 
   col_mutation_type = "Variant_Classification", 
-  genes_to_ignore = somaticflags,
-  draw_tmb_barplot = TRUE
+  draw_gene_barplot = TRUE,
+  draw_tmb_barplot = TRUE,
 )
+```
+
+### Add clinical metadata
+
+We'll read in our data from `data/gbm_clinical.xlsx`
+
+```{r}
+# Read Genomic Data
+clinical <- read_excel(here("data/gbm_clinical.xlsx"))
+
+# List all columns
+colnames(clinical)
+
+# Print First few rows
+head(clinical)
+
+# See the whole dataset (uncomment and run)
+# View(clinical)
+```
+
+As long as it contains a column name that matches the value of `col_samples`, we can just supply entire dataset to the \`metadata\` argument and choose which columns to plot
+
+```{r}
+ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample", 
+  col_mutation_type = "Variant_Classification",
+  metadata = clinical, 
+  cols_to_plot_metadata = c("histological_type", "gender", "vital_status")
+)
+```
+
+Custom palettes and sorting by metadata
+
+```{r}
+ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample", 
+  col_mutation_type = "Variant_Classification",
+  draw_tmb_barplot = TRUE,
+  metadata = clinical, 
+  cols_to_plot_metadata = c("histological_type", "gender", "vital_status"),
+  metadata_palette = list(
+    "gender" = c("MALE" = "blue", "FEMALE" = "pink"),
+    "vital_status" = c("Alive" = "green", "Dead" = "maroon")
+    ), 
+   metadata_sort_cols = c("gender")
+)
+```
+
+## Step 4: Multiomics!!
+
+See [manual](https://selkamand.github.io/ggoncoplot/articles/manual.html) for more info.
+
+Will need to install express first with
+
+```         
+install.packages("remotes")
+remotes::install_github("selkamand/express")
+```
+
+```{r}
+library(express)
+library(patchwork)
+library(ggiraph)
+
+oncoplot <- ggoncoplot(
+  gbm, 
+  col_genes = "Gene", 
+  col_samples = "Sample", 
+  col_mutation_type = "Variant_Classification",
+  metadata = clinical, 
+  draw_tmb_barplot = TRUE,
+  cols_to_plot_metadata = c("histological_type", "gender", "vital_status"),
+  interactive = FALSE
+)
+
+tsne_expression <- express_precomputed("GBM", datatype = "expression", interactive = FALSE)
+
+## Combine plots with patchwork
+combined_plots <- (tsne_expression / oncoplot)  + plot_layout(heights = c(2, 8))
+
+# View the interactive version with ggiraph
+interactive_multiplot <- girafe(ggobj = combined_plots, height_svg = 6, width_svg = 10)
+
+# Add some settings to choose how to make combined plots interactive
+interactive_multiplot <- girafe_options(x = interactive_multiplot,
+    opts_selection(type = "multiple", only_shiny = FALSE, css = "opacity: 1"),
+    opts_selection_inv(css = "opacity: 0.12")
+    )
+
+interactive_multiplot
 ```
